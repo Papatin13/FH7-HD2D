@@ -12,13 +12,21 @@ style of the original, and everything can be played with **mouse and keyboard**.
 
 ## Playing
 
-1. Download the latest version from **Releases** and unpack it (Linux x86-64).
-2. Run `./start.sh`.
-3. In the launcher, choose the ROM or drop it onto the window. Only the unmodified
-   US ROM is accepted (game code `AE7E`, CRC32 `2A524221`). After that the game starts directly.
+Download the latest version from **Releases**:
 
-The save file (`.sav`) is stored next to the ROM. Settings: `~/.local/share/godot/app_userdata/FE7-HD2D/`.
-To open the launcher again: `FE7HD_LAUNCHER=1 ./start.sh`.
+| | |
+|---|---|
+| `FE7-HD2D-…-x86_64.AppImage` | Linux: make it executable (`chmod +x`, or Properties → "Allow executing") and double-click it |
+| `FE7-HD2D-…-windows-x86_64.zip` | Windows: unpack and start `FE7-HD2D.exe`. It is not signed, so SmartScreen may warn: "More info" → "Run anyway" |
+| `FE7-HD2D-…-linux-x86_64.tar.gz` | Linux as a plain folder: unpack and start `FE7-HD2D.x86_64` |
+
+Put your ROM next to the game and it is found automatically; otherwise the launcher asks
+for it (choose it or drop it onto the window). Only the unmodified US ROM is accepted
+(game code `AE7E`, CRC32 `2A524221`).
+
+The save file (`.sav`) is stored next to the ROM. Settings: `~/.local/share/godot/app_userdata/FE7-HD2D/`
+(Linux), `%APPDATA%\Godot\app_userdata\FE7-HD2D\` (Windows). To open the launcher again,
+start the game with the environment variable `FE7HD_LAUNCHER=1`.
 
 ### Controls
 
@@ -59,14 +67,17 @@ shared** – `core/generated/` is therefore ignored by git, and `tools/package.s
 such builds. Without ROM code everything runs on the interpreter with identical game
 behaviour (> 500 frames/s on an ordinary PC).
 
-Building a release package:
+Building the release files (AppImage, Windows zip, Linux tar.gz):
 
 ```sh
-tools/build.sh
+tools/build.sh                     # Linux core
+tools/build.sh --windows           # Windows core, cross-compiled (rustup target + MinGW)
+python3 tools/fetch_templates.py   # only the needed Godot export templates (~300 MB)
 tools/package.sh /path/to/Godot_v4.5.1-stable_linux.x86_64 1.0.0   # -> dist/
 ```
 
-Pushing a git tag `v*` also builds the package with GitHub Actions and attaches it to a release.
+Pushing a git tag `v*` does all of this on GitHub Actions (the Windows core is built there
+with MSVC) and attaches the three files to a release.
 
 ## Layout
 
@@ -80,7 +91,7 @@ core/            game core in Rust (Cargo workspace)
   traces/        block addresses for the recompiler (no game data)
 godot/           Godot project: scripts, shaders, fonts
   ui/frames.json blueprint of the menu frames - only addresses in the ROM, the art comes from the ROM
-tools/           build and package scripts, release templates
+tools/           build, export and package scripts, AppImage files, release readme
 third_party/     licenses of the third-party components (Godot, godot-rust, fonts ...)
 ```
 

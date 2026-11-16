@@ -1,0 +1,5 @@
+#!/bin/sh
+# Starts the game inside the AppImage. The launcher looks for the ROM next to
+# the .AppImage file first (the APPIMAGE variable points at it).
+HERE="$(dirname "$(readlink -f "$0")")"
+exec "$HERE/usr/bin/FE7-HD2D.x86_64" "$@"

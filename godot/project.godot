@@ -5,6 +5,7 @@ config_version=5
 config/name="FE7-HD2D"
 config/description="Unofficial HD-2D remake, needs your own ROM"
 run/main_scene="res://main.tscn"
+config/icon="res://icon.png"
 config/features=PackedStringArray("4.5", "Forward Plus")
 
 [display]

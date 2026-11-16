@@ -350,12 +350,12 @@ func _ready() -> void:
 		for c in t0.split(";", false):
 			test_cmds.append(c.split(":"))
 	elif (rom == "" or not core.check_rom(rom).ok) and t0 != "":
-		rom = core.find_rom(ProjectSettings.globalize_path("res://"))
+		rom = core.find_rom(_rom_hint())
 	if rom == "" or not core.check_rom(rom).ok:
 		if t0 != "" and test_cmds.is_empty():
 			for c in t0.split(";", false):
 				test_cmds.append(c.split(":"))
-		_open_launcher(core.find_rom(ProjectSettings.globalize_path("res://")))
+		_open_launcher(core.find_rom(_rom_hint()))
 		return
 	_boot(rom)
 
@@ -997,11 +997,26 @@ func _painted_title(off: bool, area: Rect2i, mode: int, ink: bool) -> Texture2D:
 		return null
 	return ImageTexture.create_from_image(img.get_region(used))
 
+## A font from res://fonts: the file itself when it is there (source runs), the
+## imported font in an exported game (the pack only holds the imported version).
 func _font(path: String) -> FontFile:
 	var f := FontFile.new()
-	f.load_dynamic_font(ProjectSettings.globalize_path(path))
+	if FileAccess.file_exists(path):
+		f.data = FileAccess.get_file_as_bytes(path)
+	else:
+		var r = load(path)
+		if r is FontFile:
+			f = (r as FontFile).duplicate()
 	f.multichannel_signed_distance_field = true
 	return f
+
+## Where to look for the ROM first: next to the game. In an exported game that is
+## the folder of the program (or of the AppImage file), otherwise the project.
+func _rom_hint() -> String:
+	if OS.has_feature("template"):
+		var ai := OS.get_environment("APPIMAGE")
+		return ai.get_base_dir() if ai != "" else OS.get_executable_path().get_base_dir()
+	return ProjectSettings.globalize_path("res://")
 
 func _lbl(text: String, font: Font, size: int, col: Color, pos: Vector2, parent: Control) -> Label:
 	var l := Label.new()

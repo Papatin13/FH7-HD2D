@@ -16,10 +16,11 @@
 /godot/.godot/*
 !/godot/.godot/extension_list.cfg
 *.import
-/godot/export_presets.cfg
 
 # --- misc ---
 *.png
 !/docs/*.png
+!/godot/icon.png
+!/tools/appimage/*.png
 shots/
 .DS_Store

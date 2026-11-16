@@ -13,18 +13,26 @@ trademark of Nintendo.
 
 Starting
 --------
-./start.sh   (or double-click -> "Run as program")
+AppImage (Linux):  make the file executable (right click -> Properties ->
+                   "Allow executing", or chmod +x) and double-click it.
+Linux folder:      ./FE7-HD2D.x86_64
+Windows:           unpack the zip and start FE7-HD2D.exe. The program is not
+                   signed, so Windows may say "Windows protected your PC":
+                   click "More info" -> "Run anyway".
+
+Put your ROM next to the game (next to the .AppImage, the program or the
+folder above it) and it is found automatically.
 
 On the first start the launcher appears:
   * Click "Choose ROM ..." or drop the .gba file onto the window.
   * The ROM is checked (only the unmodified US ROM fits, CRC32 2A524221).
   * "Play" - the ROM is remembered, from then on the game starts directly.
-If the ROM lies in the folder above this one, it is suggested already.
 
 The save file (.sav) is stored next to the ROM.
-Settings: ~/.local/share/godot/app_userdata/FE7-HD2D/
-To choose another ROM: delete settings.cfg there, or start with
-FE7HD_LAUNCHER=1 ./start.sh
+Settings: Linux   ~/.local/share/godot/app_userdata/FE7-HD2D/
+          Windows %APPDATA%\Godot\app_userdata\FE7-HD2D\
+To choose another ROM: delete settings.cfg there, or start the game with the
+environment variable FE7HD_LAUNCHER=1.
 
 Controls (mouse and keyboard)
 -----------------------------
@@ -39,9 +47,8 @@ Debug mode: Settings -> "Debug mode (choose chapter)", then
 
 Contents
 --------
-engine/godot          Godot 4.5.1 (Linux x86-64)
-game/                 Godot project (scripts, shaders, fonts)
-game/bin/libfe7hd.so  game core (interpreter, contains no game code)
-licenses/             licenses of the third-party components
-LICENSE.txt           MIT license of the project's own code
-Source code:          https://github.com/Papatin13/FH7-HD2D
+FE7-HD2D(.x86_64/.exe)  the game (Godot 4.5.1 export)
+libfe7hd.so / fe7hd.dll game core (interpreter, contains no game code)
+licenses/               licenses of the third-party components
+LICENSE.txt             MIT license of the project's own code
+Source code:            https://github.com/Papatin13/FH7-HD2D

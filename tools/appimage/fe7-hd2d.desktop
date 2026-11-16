@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=FE7-HD2D
+Comment=Unofficial HD-2D remake (needs your own ROM)
+Exec=AppRun
+Icon=fe7-hd2d
+Categories=Game;StrategyGame;
+Terminal=false
