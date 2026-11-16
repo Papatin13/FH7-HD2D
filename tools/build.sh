@@ -22,4 +22,4 @@ else
     rm -f "$ROOT/godot/bin/.contains-rom-code"
 fi
 cp target/release/libfe7hd.so "$ROOT/godot/bin/"
-echo "fertig: godot/bin/libfe7hd.so"
+echo "done: godot/bin/libfe7hd.so"

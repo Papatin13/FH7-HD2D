@@ -1,42 +1,42 @@
-# Spielkern (Rust)
+# Game core (Rust)
 
-Der Kern führt das Spiel aus dem ROM des Spielers aus und stellt dem Godot-Projekt den
-Spielzustand bereit. Gebaut wird er über `tools/build.sh` im Hauptordner.
+The core runs the game from the player's ROM and hands the game state to the Godot
+project. It is built with `tools/build.sh` in the main folder.
 
-## Wie es funktioniert
+## How it works
 
 ```
 crates/
-  gba/      Plattformschicht: Speicher, CPU-Semantik (ARM/Thumb), Software-PPU (Modi 0–5, Affine,
-            Sprites, Fenster, Blending, Mosaik), DMA, Timer, IRQ, BIOS-Ersatz (HLE),
-            Sound (Direct Sound FIFO + 4 PSG-Kanäle), Savestates
-  recomp/   Statischer Rekompiler: übersetzt den Maschinencode des ROMs in Rust-Quelltext
-  fe7gen/   Platzhalter; mit tools/build.sh <rom> bindet er den aus DEINEM ROM erzeugten Code ein
-            (core/generated/: ~60 000 Basisblöcke / ~317 000 Instruktionen, nie hochladen)
-  fe7hd/    GDExtension für das Godot-Projekt (Klasse Fe7Core): Spielzustand, Karten, Texte, Rahmen
-  fe7/      Eigenständiges 2D-Frontend (Fenster, Tastatur, Maus, Audio) – nützlich zum Testen
-traces/     Blockadressen aus Spielabläufen, mit denen der Rekompiler Code findet (keine Spieldaten)
+  gba/      platform layer: memory, CPU semantics (ARM/Thumb), software PPU (modes 0-5, affine,
+            sprites, windows, blending, mosaic), DMA, timers, IRQ, BIOS replacement (HLE),
+            sound (Direct Sound FIFO + 4 PSG channels), save states
+  recomp/   static recompiler: translates the ROM's machine code into Rust source
+  fe7gen/   placeholder; with tools/build.sh <rom> it links the code generated from YOUR ROM
+            (core/generated/: ~60,000 basic blocks / ~317,000 instructions, never upload it)
+  fe7hd/    GDExtension for the Godot project (class Fe7Core): game state, maps, texts, frames
+  fe7/      standalone 2D frontend (window, keyboard, mouse, audio) - useful for testing
+traces/     block addresses from play sessions that help the recompiler find code (no game data)
 ```
 
-Der Rekompiler findet Code per rekursivem Abstieg ab dem Reset-Vektor, über Funktionszeiger im ROM
-und über Spuren echter Spielabläufe. Jeder Basisblock wird zu einer Rust-Funktion, die dieselben
-Instruktions-Helfer wie der Referenz-Interpreter aufruft (Operanden schon dekodiert, Literal-Pools
-als Konstanten eingefaltet). Code, den das Spiel zur Laufzeit ins IWRAM kopiert (Sound-Mixer,
-IRQ-Handler), wird ebenfalls rekompiliert und vor jeder Ausführung gegen den RAM-Inhalt geprüft.
-Was nicht rekompiliert ist, läuft über den Interpreter – das Spiel bleibt so immer lauffähig.
+The recompiler finds code by recursive descent from the reset vector, through function
+pointers in the ROM and through traces of real play. Every basic block becomes a Rust
+function that calls the same instruction helpers as the reference interpreter (operands
+already decoded, literal pools folded into constants). Code the game copies into IWRAM at
+runtime (sound mixer, IRQ handler) is recompiled too and checked against the RAM contents
+before each run. Whatever is not recompiled runs on the interpreter, so the game always works.
 
-Prüfung: `--verify` führt jeden rekompilierten Block aus, macht ihn rückgängig, führt dieselben
-Instruktionen im Interpreter aus und vergleicht Register und jeden Speicherschreibzugriff.
-Stand der Tests: >240 Mio. Blockausführungen (Intro, Titel, Spielstart, Prolog, Kampf) ohne Abweichung.
+Verification: `--verify` runs every recompiled block, undoes it, runs the same instructions
+on the interpreter and compares registers and every memory write. Test status: more than
+240 million block executions (intro, title, game start, prologue, battle) without a mismatch.
 
-Grafik, Musik und Texte liest das Programm zur Laufzeit aus dem ROM. Der erzeugte Rust-Code stammt
-ebenfalls aus dem ROM und liegt deshalb nur lokal in `core/generated/` (von git ignoriert).
+Graphics, music and text are read from the ROM at runtime. The generated Rust code also comes
+from the ROM and therefore only lives locally in `core/generated/` (ignored by git).
 
-## Entwickler-Optionen des 2D-Frontends
+## Developer options of the 2D frontend
 
 ```
 cargo run --release -p fe7 -- <rom.gba>
 ```
 
 `--headless --frames N --script "120:START,200:A" --shot-every N --out dir`, `--verify`, `--interp`,
-`--trace datei.txt` (sammelt Blockadressen für den Rekompiler), `--save/--load`.
+`--trace file.txt` (collects block addresses for the recompiler), `--save/--load`.

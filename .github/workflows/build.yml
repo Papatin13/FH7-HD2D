@@ -25,19 +25,19 @@ jobs:
             core/target
           key: cargo-${{ hashFiles('core/Cargo.lock') }}
 
-      - name: Spielkern bauen (ohne ROM-Code)
+      - name: Build the game core (no ROM code)
         run: tools/build.sh
 
       - name: Tests
         working-directory: core
         run: cargo test --release -p gba -p fe7hd
 
-      - name: Godot 4.5.1 laden
+      - name: Download Godot 4.5.1
         run: |
           curl -sSL -o godot.zip https://github.com/godotengine/godot/releases/download/4.5.1-stable/Godot_v4.5.1-stable_linux.x86_64.zip
           unzip -q godot.zip
 
-      - name: Paket bauen
+      - name: Build the package
         run: |
           VER="${GITHUB_REF_NAME#v}"
           case "$GITHUB_REF" in refs/tags/*) ;; *) VER="dev-${GITHUB_SHA::7}" ;; esac

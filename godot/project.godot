@@ -1,9 +1,9 @@
-; FE7-HD2D - inoffizielles HD-2D-Remake (benötigt das eigene ROM)
+; FE7-HD2D - unofficial HD-2D remake (needs your own ROM)
 config_version=5
 
 [application]
 config/name="FE7-HD2D"
-config/description="Inoffizielles HD-2D-Remake, benötigt das eigene ROM"
+config/description="Unofficial HD-2D remake, needs your own ROM"
 run/main_scene="res://main.tscn"
 config/features=PackedStringArray("4.5", "Forward Plus")
 

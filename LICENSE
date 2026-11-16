@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2026 Die Autoren von FE7-HD2D
+Copyright (c) 2026 The FE7-HD2D authors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -21,7 +21,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ---
-Gilt für den eigenen Code dieses Projekts (godot/scripts, godot/shaders,
-godot/ui/frames.json, core/, tools/). Fremdbestandteile stehen unter ihren
-eigenen Lizenzen, siehe third_party/UEBERSICHT.txt. Spieldaten von Nintendo /
-Intelligent Systems sind nicht enthalten und fallen nicht unter diese Lizenz.
+Applies to the project's own code (godot/scripts, godot/shaders,
+godot/ui/frames.json, core/, tools/). Third-party components are under their
+own licenses, see third_party/OVERVIEW.txt. Game data of Nintendo /
+Intelligent Systems is not included and not covered by this license.

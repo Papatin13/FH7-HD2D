@@ -696,6 +696,11 @@ impl Fe7Core {
             let dk = self.drive_keys();
             let g = self.g.as_mut().unwrap();
             g.no_render = fast;
+            if let Some(c) = g.debug_chapter {
+                // debug chapter: keep it set until StartChapter takes it, so the
+                // chapter's intro scenes already belong to it
+                g.write8(0x0202_BC06, c);
+            }
             let mk = if i == 0 && self.drive == Drive::None {
                 let inp = std::mem::take(&mut self.minp);
                 self.minp.pos = inp.pos;
@@ -869,7 +874,7 @@ impl Fe7Core {
     /// Texture for the 3D buildings: the cut-out art with the ground holes of each
     /// cell filled with the nearest colour of the building (no grass on walls/roofs).
     #[func]
-    fn building_tex(&mut self, margin: i32, kinds: PackedByteArray) -> Option<Gd<Image>> {
+    fn building_tex(&mut self, margin: i32, kinds: PackedByteArray, strip: PackedByteArray) -> Option<Gd<Image>> {
         let g = self.g.as_mut().unwrap();
         let (w, h) = g.hd_map_size();
         if w == 0 {
@@ -879,9 +884,33 @@ impl Fe7Core {
         let full = g.hd_map_image(margin);
         let iw = ((w + 2 * margin) * 16) as usize;
         let ih = ((h + 2 * margin) * 16) as usize;
+        let terr = self.terrain(margin);
+        let strip = strip.as_slice();
         for cy in 0..ih / 16 {
             for cx in 0..iw / 16 {
                 let at = |x: usize, y: usize| (cy * 16 + y) * iw + cx * 16 + x;
+                let opaque = (0..256).filter(|&k| img[at(k % 16, k / 16)] >> 24 != 0).count();
+                let t = terr.as_slice()[cy * iw / 16 + cx] & 0x7F;
+                if opaque > 0 && strip.contains(&t) {
+                    // grass and bushes in a wall's cell are not part of the wall either
+                    // (their greens are not always the plain ground's)
+                    let keep: Vec<u32> = (0..256).map(|k| img[at(k % 16, k / 16)]).collect();
+                    let mut left = 0;
+                    for k in 0..256 {
+                        let c = keep[k];
+                        let (r, gg, b) = ((c >> 16) & 0xFF, (c >> 8) & 0xFF, c & 0xFF);
+                        if c >> 24 != 0 && gg >= r && gg >= b && gg > r.min(b) + 30 {
+                            img[at(k % 16, k / 16)] = 0;
+                        } else if c >> 24 != 0 {
+                            left += 1;
+                        }
+                    }
+                    if left == 0 {
+                        for k in 0..256 {
+                            img[at(k % 16, k / 16)] = keep[k];
+                        }
+                    }
+                }
                 let opaque = (0..256).filter(|&k| img[at(k % 16, k / 16)] >> 24 != 0).count();
                 if opaque == 0 {
                     // nothing of the building left in this cell: keep the original art
@@ -2398,6 +2427,19 @@ impl Fe7Core {
             }
         }
         image(w, h, &px)
+    }
+
+    /// Debug: the next chapter start loads chapter `id` instead (-1 cancels).
+    #[func]
+    fn debug_chapter(&mut self, id: i32) {
+        let g = self.g.as_mut().unwrap();
+        g.debug_chapter = if (0..=0xFF).contains(&id) { Some(id as u8) } else { None };
+    }
+
+    /// Debug: chapter still waiting to be started, or -1.
+    #[func]
+    fn debug_chapter_pending(&self) -> i32 {
+        self.g.as_ref().unwrap().debug_chapter.map_or(-1, |c| c as i32)
     }
 
     /// Chapter number (gPlaySt + 0x0E).

@@ -127,6 +127,8 @@ pub struct Gba {
     /// last widening (old width, new width).
     pub map_load_buf: u32,
     pub map_widened: Option<(u32, u32)>,
+    /// Debug: chapter to start instead of the next one (applied once in StartChapter).
+    pub debug_chapter: Option<u8>,
     /// Map width (in tiles) narrow maps are widened to at load (0 = off).
     /// Fixed per widescreen setting so suspended chapters stay consistent.
     pub wide_cols: u32,
@@ -177,6 +179,7 @@ impl Gba {
             mapgen: Default::default(),
             map_load_buf: 0,
             map_widened: None,
+            debug_chapter: None,
             wide_cols: 0,
             watch_hits: Default::default(),
         });
@@ -283,6 +286,15 @@ impl Gba {
 
     fn exec_block(&mut self) {
         let thumb = self.cpu.t;
+        if self.debug_chapter.is_some()
+            && (self.pc == 0x0802_E028 || self.pc == 0x0802_E190 || self.pc == 0x0801_8D88)
+        {
+            // StartChapter (new / restarted chapter) or, as a fallback, the chapter map
+            // loader: the debug menu's chapter is used from here on (gPlaySt.chapterIndex);
+            // until then it is kept set every frame
+            let c = self.debug_chapter.take().unwrap();
+            self.write8(0x0202_BC06, c);
+        }
         if self.hd.on && self.pc == 0x0800_5814 {
             // Text_DrawCharacter(text, str): talk boxes print one letter at a time
             self.hd_char_hook(self.cpu.r[0], self.cpu.r[1]);

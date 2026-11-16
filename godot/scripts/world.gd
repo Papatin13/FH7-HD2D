@@ -13,15 +13,18 @@ const NATURAL := {
 	0x2F: 0.25, 0x31: -0.2, 0x36: -0.5, 0x3C: -0.38,
 }
 const BLOCK := {
-	0x0B: 0.45, 0x13: 0.0, 0x14: 0.0, 0x19: 0.25, 0x1A: 1.0, 0x1B: 1.0,
-	0x1D: 1.0, 0x1E: 1.0, 0x1F: 0.1, 0x22: 1.0, 0x24: 0.55,
+	0x13: 0.0, 0x14: 0.0, 0x19: 0.25, 0x1A: 1.0, 0x1B: 1.0,
+	0x1D: 1.0, 0x1E: 1.0, 0x1F: 0.1, 0x22: 1.0,
 	# fence, snag (breakable wall), bridge, barrel, ship rail / brace / mast
 	0x32: 0.25, 0x33: 1.0, 0x34: 0.0, 0x39: 0.3, 0x3D: 0.3, 0x3F: 0.5, 0x40: 1.4,
 }
 # HD-2D standees: the original pixel art stands upright (ground colours cut out),
 # the ground below becomes plain grass. Trees per cell, buildings per connected group.
 const TREES := [0x0C, 0x0D]
-const BUILDINGS := [0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x23, 0x2C, 0x2E]
+# village, house, armory, vendor, arena, fort, gate, castle gate, church, inn ...
+const BUILDINGS := [0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x23, 0x24, 0x2C, 0x2E, 0x30, 0x38]
+# tents (Lyn's yurt in the prologue): a soft dome instead of walls and a roof
+const TENTS := [0x2C]
 const TREE_SCALE := 1.35
 const BUILDING_SCALE := 1.3
 const WATER_Y := -0.13
@@ -39,6 +42,9 @@ var cursor_mi: MeshInstance3D
 var map_tex: ImageTexture
 var cut_tex: ImageTexture
 var bld_tex: ImageTexture   # building art with the ground holes filled
+var blocks_mi: MeshInstance3D
+var bld_mask: Image         # building pixels (ground cut away), for the pop-up buildings
+var bld_front := {}         # building cell index -> z of its facade (units stand in front)
 var standees: Array = []
 var ground_uv := {}   # cell index -> cell index whose tile is used as ground
 var atlas_tex: ImageTexture
@@ -223,9 +229,16 @@ func rebuild(core_ref) -> void:
 		var t: int = terr[i]
 		block_top[i] = BLOCK[t & 0x7F] if BLOCK.has(t & 0x7F) else -INF
 
+	bld_mask = core.map_cutout(MARGIN, PackedByteArray(BUILDINGS))
+	bld_front.clear()
 	_plan_standees(terr)
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	# raised blocks (walls, pillars, doors ...) use the building texture: the ground
+	# showing in their cells is painted over, so no grass ends up on top of a wall
+	var bst := SurfaceTool.new()
+	bst.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var has_blocks := false
 	var iw := float(gw * 16)
 	var ih := float(gh * 16)
 	for cy in gh:
@@ -247,7 +260,9 @@ func rebuild(core_ref) -> void:
 			var col := Color(shade, shade, shade)
 			if bt > -INF:
 				var top := bt + maxf(maxf(h00, h10), maxf(h01, h11))
-				_quad(st, Vector3(x0, top, z0), Vector3(x0 + 1, top, z0), Vector3(x0 + 1, top, z0 + 1), Vector3(x0, top, z0 + 1),
+				var bs: SurfaceTool = bst if bt > 0.05 else st
+				has_blocks = has_blocks or bt > 0.05
+				_quad(bs, Vector3(x0, top, z0), Vector3(x0 + 1, top, z0), Vector3(x0 + 1, top, z0 + 1), Vector3(x0, top, z0 + 1),
 					uv0, Vector2(uv1.x, uv0.y), uv1, Vector2(uv0.x, uv1.y), col)
 				# walls down to the surroundings
 				var wall := Color(shade * 0.82, shade * 0.82, shade * 0.86)
@@ -268,7 +283,7 @@ func rebuild(core_ref) -> void:
 					var b: Vector3 = sd[2]
 					var ha: float = sd[3]
 					var hb: float = sd[4]
-					_quad(st, Vector3(a.x, top, a.z), Vector3(b.x, top, b.z), Vector3(b.x, hb, b.z), Vector3(a.x, ha, a.z),
+					_quad(bs, Vector3(a.x, top, a.z), Vector3(b.x, top, b.z), Vector3(b.x, hb, b.z), Vector3(a.x, ha, a.z),
 						Vector2(uv0.x, (uv0.y + uv1.y) * 0.5), Vector2(uv1.x, (uv0.y + uv1.y) * 0.5), uv1, Vector2(uv0.x, uv1.y), wall)
 			else:
 				_quad(st, Vector3(x0, h00, z0), Vector3(x0 + 1, h10, z0), Vector3(x0 + 1, h11, z0 + 1), Vector3(x0, h01, z0 + 1),
@@ -297,6 +312,16 @@ func rebuild(core_ref) -> void:
 	mat.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
 	terrain_mi.mesh = mesh
 	terrain_mi.material_override = mat
+	if blocks_mi == null:
+		blocks_mi = MeshInstance3D.new()
+		add_child(blocks_mi)
+	blocks_mi.visible = has_blocks
+	if has_blocks:
+		bst.generate_normals()
+		blocks_mi.mesh = bst.commit()
+		var bmat := mat.duplicate() as StandardMaterial3D
+		bmat.albedo_texture = bld_tex
+		blocks_mi.material_override = bmat
 
 	# water surface
 	var wm := PlaneMesh.new()
@@ -382,22 +407,19 @@ func _plan_standees(terr: PackedByteArray) -> void:
 						if kind.call(n.x, n.y) == 2 and not seen.has(_cell_index(n.x, n.y)):
 							seen[_cell_index(n.x, n.y)] = true
 							stack.append(n)
-				if x1 - x0 >= 4 or y1 - y0 >= 4:
-					# castles and big forts: a box per cell, so the outline follows the art
-					for yy in range(y0, y1 + 1):
-						for xx in range(x0, x1 + 1):
-							if kind.call(xx, yy) == 2:
-								_add_building(xx, yy, xx, yy, true)
-					continue
 			if k == 1:
 				_add_standee(x0, y0, x1, y1, true)
 			else:
-				_add_building(x0, y0, x1, y1)
+				var tent := false
+				for yy in range(y0, y1 + 1):
+					for xx in range(x0, x1 + 1):
+						tent = tent or (terr[_cell_index(xx, yy)] & 0x7F) in TENTS
+				_add_building(x0, y0, x1, y1, false, tent)
 
 ## Real 3D building from the original tile art: the upper part of the art is the
 ## roof, the lower part the front wall (door, windows). Single cells get a gable
-## roof, larger groups (forts, castles, tents) a box with the art as flat roof.
-func _add_building(x0: int, y0: int, x1: int, y1: int, flat := false) -> void:
+## roof, everything else pops up from the art (see _popup).
+func _add_building(x0: int, y0: int, x1: int, y1: int, flat := false, tent := false) -> void:
 	var iw := float(gw * 16)
 	var ih := float(gh * 16)
 	var px0 := x0 * 16 + 0.5
@@ -416,7 +438,9 @@ func _add_building(x0: int, y0: int, x1: int, y1: int, flat := false) -> void:
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var white := Color(1, 1, 1)
 	var side := Color(0.86, 0.86, 0.9)
-	var single := x1 == x0 and y1 == y0 and not flat
+	var pieces := _building_pieces(x0 * 16, y0 * 16, (x1 - x0 + 1) * 16, (y1 - y0 + 1) * 16)
+	# a lone house that fills its cell gets a gable roof, everything else pops up
+	var single := x1 == x0 and y1 == y0 and pieces.size() == 1 and int(pieces[0][1]) >= 200 and not tent
 	if single:
 		var split := py0 + (py1 - py0) * 0.55   # roof above, wall below
 		var vr0 := py0 / ih
@@ -454,23 +478,14 @@ func _add_building(x0: int, y0: int, x1: int, y1: int, flat := false) -> void:
 			Vector2(u0, vr0), Vector2(u1, vr0), Vector2(u1, vs), Vector2(u0, vs), white)
 		_quad(st, Vector3(r1, top + hr, zm), Vector3(r0, top + hr, zm), Vector3(r0, top - 0.05, wz0 - ov), Vector3(r1, top - 0.05, wz0 - ov),
 			Vector2(u0, vr0), Vector2(u1, vr0), Vector2(u1, vs), Vector2(u0, vs), side)
+	elif pieces.is_empty():
+		return
 	else:
-		var h := 0.75
-		var top := base + h
-		var v0 := py0 / ih
-		var v1 := py1 / ih
-		var vf := (py1 - 7.0) / ih   # lowest row of the art: the facade
-		_quad(st, Vector3(wx0, top, wz0), Vector3(wx1, top, wz0), Vector3(wx1, top, wz1), Vector3(wx0, top, wz1),
-			Vector2(u0, v0), Vector2(u1, v0), Vector2(u1, v1), Vector2(u0, v1), white)
-		_quad(st, Vector3(wx0, top, wz1), Vector3(wx1, top, wz1), Vector3(wx1, base, wz1), Vector3(wx0, base, wz1),
-			Vector2(u0, vf), Vector2(u1, vf), Vector2(u1, v1), Vector2(u0, v1), white)
-		_quad(st, Vector3(wx1, top, wz0), Vector3(wx0, top, wz0), Vector3(wx0, base, wz0), Vector3(wx1, base, wz0),
-			Vector2(u0, vf), Vector2(u1, vf), Vector2(u1, v1), Vector2(u0, v1), side)
-		var ud := (wz1 - wz0) / (wx1 - wx0) * (u1 - u0)
-		_quad(st, Vector3(wx0, top, wz0), Vector3(wx0, top, wz1), Vector3(wx0, base, wz1), Vector3(wx0, base, wz0),
-			Vector2(u0, vf), Vector2(u0 + ud, vf), Vector2(u0 + ud, v1), Vector2(u0, v1), side)
-		_quad(st, Vector3(wx1, top, wz1), Vector3(wx1, top, wz0), Vector3(wx1, base, wz0), Vector3(wx1, base, wz1),
-			Vector2(u1 - ud, vf), Vector2(u1, vf), Vector2(u1, v1), Vector2(u1 - ud, v1), side)
+		for pc in pieces:
+			if tent:
+				_dome(st, x0, y0, x1, y1, base, pc[0])
+			else:
+				_popup(st, x0, y0, x1, y1, base, pc[0])
 	st.generate_normals()
 	var mi := MeshInstance3D.new()
 	mi.mesh = st.commit()
@@ -483,6 +498,221 @@ func _add_building(x0: int, y0: int, x1: int, y1: int, flat := false) -> void:
 	mi.material_override = mat
 	add_child(mi)
 	standees.append(mi)
+
+## Pop-up building from the top-down art: per pixel column the lowest rows are the
+## front wall (door, windows) standing upright on the ground, the rows above are the
+## roof lying flat on top of it. The outline follows the art, so round arenas get a
+## round wall and no grass from the cell corners ends up on walls or roofs.
+func _popup(st: SurfaceTool, x0: int, y0: int, x1: int, y1: int, base: float, m: PackedByteArray) -> bool:
+	var iw := float(gw * 16)
+	var ih := float(gh * 16)
+	var px0 := x0 * 16
+	var px1 := (x1 + 1) * 16
+	var py0 := y0 * 16
+	var py1 := (y1 + 1) * 16
+	var n := px1 - px0
+	var t := PackedInt32Array()
+	var f := PackedInt32Array()
+	t.resize(n)
+	f.resize(n)
+	var tallest := 0
+	for i in n:
+		t[i] = -1
+		f[i] = -1
+		for y in range(py0, py1):
+			if m[(y - py0) * n + i]:
+				if t[i] < 0:
+					t[i] = y
+				f[i] = y + 1
+		if t[i] >= 0:
+			tallest = maxi(tallest, f[i] - t[i])
+	if tallest == 0:
+		return false
+	# one wall height for the whole building: about the lower 40 % of the art
+	var wall_px := clampi(int(round(tallest * 0.4)), 4, 11)
+	var hw := wall_px * PX * 1.35
+	var top := base + hw
+	var white := Color(1, 1, 1)
+	var side := Color(0.8, 0.8, 0.86)
+	var back := Color(0.62, 0.62, 0.7)
+	var zof := func(py: float) -> float: return py / 16.0 - MARGIN
+	for i in n:
+		if t[i] < 0:
+			continue
+		var c := px0 + i
+		var xa := float(c) / 16.0 - MARGIN
+		var xb := xa + PX
+		var u0 := (c + 0.1) / iw
+		var u1 := (c + 0.9) / iw
+		var fw := mini(wall_px, f[i] - t[i])        # facade rows of this column
+		var vt := t[i] / ih
+		var vw := float(f[i] - fw) / ih              # roof ends, wall begins
+		var vf := (f[i] - 0.01) / ih
+		var zt: float = zof.call(t[i])
+		var zf: float = zof.call(f[i])
+		# roof (if the column is taller than the wall) and front wall
+		if f[i] - fw > t[i]:
+			_quad(st, Vector3(xa, top, zt), Vector3(xb, top, zt), Vector3(xb, top, zf), Vector3(xa, top, zf),
+				Vector2(u0, vt), Vector2(u1, vt), Vector2(u1, vw), Vector2(u0, vw), white)
+		else:
+			_quad(st, Vector3(xa, top, zt), Vector3(xb, top, zt), Vector3(xb, top, zf), Vector3(xa, top, zf),
+				Vector2(u0, vw), Vector2(u1, vw), Vector2(u1, vw), Vector2(u0, vw), white)
+		_quad(st, Vector3(xa, top, zf), Vector3(xb, top, zf), Vector3(xb, base, zf), Vector3(xa, base, zf),
+			Vector2(u0, vw), Vector2(u1, vw), Vector2(u1, vf), Vector2(u0, vf), white)
+		# back wall, in the colour of the roof's back edge
+		_quad(st, Vector3(xb, top, zt), Vector3(xa, top, zt), Vector3(xa, base, zt), Vector3(xb, base, zt),
+			Vector2(u0, vt), Vector2(u1, vt), Vector2(u1, vt + PX / ih), Vector2(u0, vt + PX / ih), back)
+		# side walls where the neighbouring column does not cover this one
+		for dir in [-1, 1]:
+			var j: int = i + dir
+			var xs := xa if dir < 0 else xb
+			var segs := []
+			if j < 0 or j >= n or t[j] < 0:
+				segs.append([t[i], f[i]])
+			else:
+				if t[j] > t[i]:
+					segs.append([t[i], mini(t[j], f[i])])
+				if f[j] < f[i]:
+					segs.append([maxi(f[j], t[i]), f[i]])
+			for sg in segs:
+				if sg[1] <= sg[0]:
+					continue
+				var za: float = zof.call(sg[0])
+				var zb: float = zof.call(sg[1])
+				var a := Vector3(xs, top, za)
+				var b := Vector3(xs, top, zb)
+				if dir > 0:
+					var tmp := a
+					a = b
+					b = tmp
+				_quad(st, a, b, Vector3(b.x, base, b.z), Vector3(a.x, base, a.z),
+					Vector2(u0, vw), Vector2(u1, vw), Vector2(u1, vf), Vector2(u0, vf), side)
+		# units on a building cell stand in front of its wall
+		var cell := _cell_index(c / 16, (f[i] - 1) / 16)
+		bld_front[cell] = maxf(float(bld_front.get(cell, -INF)), zf)
+	return true
+
+## The buildings in a rectangle of the art: ground is already cut away, bushes and
+## hedges (green) are dropped too, and each connected piece of at least 40 pixels
+## becomes its own building ([mask, pixel count]); loose bits stay on the ground.
+func _building_pieces(px: int, py: int, w: int, h: int) -> Array:
+	var out := []
+	if bld_mask == null:
+		return out
+	var m := PackedByteArray()
+	m.resize(w * h)
+	for y in h:
+		for x in w:
+			var c := bld_mask.get_pixel(px + x, py + y)
+			if c.a > 0.5 and not (c.g > c.r + 0.08 and c.g > c.b - 0.12):
+				m[y * w + x] = 1
+	var comp := PackedInt32Array()
+	comp.resize(w * h)
+	comp.fill(-1)
+	var counts := []
+	for k in w * h:
+		if m[k] == 0 or comp[k] >= 0:
+			continue
+		var id := counts.size()
+		var stack := [k]
+		comp[k] = id
+		var cnt := 0
+		while not stack.is_empty():
+			var q: int = stack.pop_back()
+			cnt += 1
+			var qx := q % w
+			var qy := q / w
+			for d in [[1, 0], [-1, 0], [0, 1], [0, -1]]:
+				var nx: int = qx + d[0]
+				var ny: int = qy + d[1]
+				if nx >= 0 and ny >= 0 and nx < w and ny < h:
+					var nk := ny * w + nx
+					if m[nk] == 1 and comp[nk] < 0:
+						comp[nk] = id
+						stack.append(nk)
+		counts.append(cnt)
+	for id in counts.size():
+		if counts[id] < 40:
+			continue
+		var pm := PackedByteArray()
+		pm.resize(w * h)
+		for k in w * h:
+			if comp[k] == id:
+				pm[k] = 1
+		out.append([pm, counts[id]])
+	return out
+
+## Tent: the art laid over a dome that rises from its outline (steep at the
+## edge, round on top), seen from above like the original picture.
+func _dome(st: SurfaceTool, x0: int, y0: int, x1: int, y1: int, base: float, m: PackedByteArray) -> void:
+	var iw := float(gw * 16)
+	var ih := float(gh * 16)
+	var px0 := x0 * 16
+	var py0 := y0 * 16
+	var w := (x1 - x0 + 1) * 16
+	var h := (y1 - y0 + 1) * 16
+	# distance of every pixel to the outside (chamfer, two passes)
+	var d := PackedFloat32Array()
+	d.resize(w * h)
+	for k in w * h:
+		d[k] = 1e6 if m[k] else 0.0
+	for y in h:
+		for x in w:
+			var k := y * w + x
+			if d[k] == 0.0:
+				continue
+			var v := 1.0 if x == 0 or y == 0 else minf(d[k - 1] + 1.0, d[k - w] + 1.0)
+			if x > 0 and y > 0:
+				v = minf(v, d[k - w - 1] + 1.4142)
+			if x < w - 1 and y > 0:
+				v = minf(v, d[k - w + 1] + 1.4142)
+			d[k] = minf(d[k], v)
+	for y in range(h - 1, -1, -1):
+		for x in range(w - 1, -1, -1):
+			var k := y * w + x
+			if d[k] == 0.0:
+				continue
+			var v := 1.0 if x == w - 1 or y == h - 1 else minf(d[k + 1] + 1.0, d[k + w] + 1.0)
+			if x < w - 1 and y < h - 1:
+				v = minf(v, d[k + w + 1] + 1.4142)
+			if x > 0 and y < h - 1:
+				v = minf(v, d[k + w - 1] + 1.4142)
+			d[k] = minf(d[k], v)
+	var dmax := 1.0
+	for k in w * h:
+		dmax = maxf(dmax, d[k])
+	var top := clampf(dmax * 0.09, 0.35, 0.95)
+	# height at pixel corners: mean of the four touching pixels
+	var hc := PackedFloat32Array()
+	hc.resize((w + 1) * (h + 1))
+	for y in h + 1:
+		for x in w + 1:
+			var sum := 0.0
+			for o in [[-1, -1], [0, -1], [-1, 0], [0, 0]]:
+				var xx: int = x + o[0]
+				var yy: int = y + o[1]
+				if xx >= 0 and yy >= 0 and xx < w and yy < h:
+					sum += d[yy * w + xx]
+			sum *= 0.25
+			hc[y * (w + 1) + x] = top * sqrt(clampf(sum / dmax, 0.0, 1.0))
+	var white := Color(1, 1, 1)
+	for y in h:
+		for x in w:
+			if not m[y * w + x]:
+				continue
+			var gx := float(px0 + x)
+			var gy := float(py0 + y)
+			var xa := gx / 16.0 - MARGIN
+			var za := gy / 16.0 - MARGIN
+			var u0 := gx / iw
+			var v0 := gy / ih
+			var u1 := (gx + 1.0) / iw
+			var v1 := (gy + 1.0) / ih
+			_quad(st, Vector3(xa, base + hc[y * (w + 1) + x], za), Vector3(xa + PX, base + hc[y * (w + 1) + x + 1], za),
+				Vector3(xa + PX, base + hc[(y + 1) * (w + 1) + x + 1], za + PX), Vector3(xa, base + hc[(y + 1) * (w + 1) + x], za + PX),
+				Vector2(u0, v0), Vector2(u1, v0), Vector2(u1, v1), Vector2(u0, v1), white)
+			var cell := _cell_index((px0 + x) / 16, (py0 + y) / 16)
+			bld_front[cell] = maxf(float(bld_front.get(cell, -INF)), za + PX)
 
 func _add_standee(x0: int, y0: int, x1: int, y1: int, tree: bool) -> void:
 	var s := Sprite3D.new()
@@ -537,12 +767,23 @@ func update_map_texture(force := false) -> void:
 			cut_tex.update(cut)
 		else:
 			cut_tex.set_image(cut)
-	var bld: Image = core.building_tex(MARGIN, PackedByteArray(BUILDINGS))
+	var blocks := _solid_kinds()
+	for t in BUILDINGS:
+		blocks.erase(t)
+	var bld: Image = core.building_tex(MARGIN, PackedByteArray(_solid_kinds()), PackedByteArray(blocks))
 	if bld != null:
 		if bld_tex.get_width() == bld.get_width() and bld_tex.get_height() == bld.get_height():
 			bld_tex.update(bld)
 		else:
 			bld_tex.set_image(bld)
+
+## Terrain whose cells get their ground painted over: buildings and raised blocks.
+func _solid_kinds() -> Array:
+	var k: Array = BUILDINGS.duplicate()
+	for t in BLOCK:
+		if BLOCK[t] > 0.05:
+			k.append(t)
+	return k
 
 ## Ground height at a map position (world units = cells).
 func height_at(x: float, z: float) -> float:
@@ -648,6 +889,9 @@ func _update_sprites() -> void:
 		s.offset = Vector2(0, h * 0.5)
 		var wx := (x + w * 0.5) * PX
 		var wz := (y + h) * PX - 0.5
+		var bf: float = bld_front.get(_cell_index(int(floor(wx)) + MARGIN, int(floor(wz)) + MARGIN), -INF)
+		if bf > -INF:
+			wz = maxf(wz, bf + 0.08)
 		var gy := height_at(wx, wz)
 		s.position = Vector3(wx, gy, wz)
 		s.scale = Vector3(1, 1.18, 1)

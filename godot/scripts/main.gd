@@ -39,7 +39,7 @@ var acc := 0.0
 var paused := false
 var cfg := ConfigFile.new()
 var settings := {"fullscreen": false, "volume": 0.8, "dof": true, "shadows": true, "hd": true, "talk": true, "menus": true,
-	"lang": "en", "quality": 2, "fps": false, "instant": false, "ffwd": 4, "rom": ""}
+	"lang": "en", "quality": 2, "fps": false, "instant": false, "ffwd": 4, "rom": "", "debug": false}
 var fps_label: Label
 var toast: Label
 var toast_t := 0.0
@@ -50,7 +50,11 @@ const QUICK := "user://quicksave.st"
 # (texts are written in German and translated here).
 const EN := {
 	"Dieses Remake enthält keine Spieldaten. Es braucht dein eigenes ROM von\nFire Emblem (GBA, USA) – zum Beispiel eine Sicherungskopie deines Moduls.": "This remake contains no game data. It needs your own ROM of\nFire Emblem (GBA, USA) - for example a backup of your cartridge.",
-	"Inoffizielles HD-2D-Remake": "Unofficial HD-2D remake", "Spielen": "Play", "ROM auswählen …": "Choose ROM …", "ROM auswählen": "Choose ROM",
+	"Inoffizielles HD-2D-Remake": "Unofficial HD-2D remake",
+	"Debug-Modus (Kapitel wählen)": "Debug mode (choose chapter)", "Kapitel wählen (Debug)": "Choose Chapter (Debug)",
+	"Kapitel wählen": "Choose Chapter", "Lyns Geschichte": "Lyn's Tale", "Eliwoods Geschichte": "Eliwood's Tale", "Hectors Geschichte": "Hector's Tale",
+	"Start mit": "Start with", "Einheiten aus einem Spielstand": "Units from a save file", "Neues Spiel (nur Einheiten des Kapitels)": "New game (chapter's units only)",
+	"Der Spielstand wird zu Kapitelbeginn überschrieben. Der Story-Modus (Lyn/Eliwood/Hector) bleibt der des Spielstands.": "The save file is overwritten when the chapter starts. The story mode (Lyn/Eliwood/Hector) stays that of the save file.", "Spielen": "Play", "ROM auswählen …": "Choose ROM …", "ROM auswählen": "Choose ROM",
 	"Tipp: Du kannst die ROM-Datei auch einfach in dieses Fenster ziehen.": "Tip: you can also drop the ROM file onto this window.",
 	"Noch kein ROM gewählt.": "No ROM chosen yet.", "ROM gefunden und geprüft:": "ROM found and checked:",
 	"Datei nicht lesbar.": "File cannot be read.", "Keine GBA-ROM-Datei.": "Not a GBA ROM file.",
@@ -1454,6 +1458,8 @@ func _rebuild_menu_items(mask: int) -> void:
 		c.queue_free()
 	var first: Button = null
 	var items := []
+	if core and not (chapter_panel and chapter_panel.visible):
+		core.debug_chapter(-1)   # back in the main menu: a chosen debug chapter was cancelled
 	if mask & 1:
 		items.append(["Fortsetzen", func(): _open_slots(0)])
 	if mask & 2:
@@ -1462,6 +1468,8 @@ func _rebuild_menu_items(mask: int) -> void:
 		items.append(["Neues Spiel", func(): _open_slots(4)])
 	if mask & 8:
 		items.append(["Spielstand löschen", func(): _open_slots(3)])
+	if settings.debug:
+		items.append(["Kapitel wählen (Debug)", func(): _open_chapters()])
 	items.append(["Einstellungen", func(): _open_settings()])
 	items.append(["Beenden", func(): _quit()])
 	for it in items:
@@ -1519,7 +1527,8 @@ func _build_settings() -> void:
 	right.add_theme_constant_override("separation", 12)
 	cols.add_child(right)
 	for spec in [["fullscreen", "Vollbild"], ["hd", "HD-2D-Karte (aus = Originalgrafik)"], ["dof", "Tiefenunschärfe"], ["shadows", "Schatten"],
-			["talk", "Sprechblasen neu gezeichnet"], ["menus", "Menüs neu gezeichnet"], ["instant", "Text sofort ganz zeigen"], ["fps", "FPS anzeigen"]]:
+			["talk", "Sprechblasen neu gezeichnet"], ["menus", "Menüs neu gezeichnet"], ["instant", "Text sofort ganz zeigen"], ["fps", "FPS anzeigen"],
+			["debug", "Debug-Modus (Kapitel wählen)"]]:
 		var cb := CheckButton.new()
 		_tt(cb, spec[1])
 		cb.add_theme_font_size_override("font_size", 24)
@@ -1586,10 +1595,13 @@ func _build_pause() -> void:
 	v.add_child(t)
 	for spec in [["Weiterspielen", func(): _set_paused(false)], ["Schnellspeichern (F5)", func(): _quick_save()],
 			["Schnellladen (F8)", func(): _quick_load()], ["Einstellungen", func(): _open_settings()],
+			["Kapitel wählen (Debug)", func(): _to_menu(); _open_chapters()],
 			["Hauptmenü", func(): _to_menu()], ["Beenden", func(): _quit()]]:
 		var b := _button(T(spec[0]), spec[1])
 		_tr_nodes.append([b, spec[0]])
 		v.add_child(b)
+		if spec[0] == "Kapitel wählen (Debug)":
+			debug_pause_btn = b
 	# FPS counter and short notices
 	fps_label = Label.new()
 	fps_label.add_theme_font_size_override("font_size", 18)
@@ -1614,6 +1626,210 @@ func _build_pause() -> void:
 	toast.modulate.a = 0.0
 	toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui_layer.add_child(toast)
+
+## Debug: list of all chapters; the next chapter start loads the one picked.
+var chapter_panel: PanelContainer
+var chapter_start: OptionButton
+var debug_pause_btn: Button
+const CHAPTER_GROUPS := [["Lyns Geschichte", 0x00, 0x0B], ["Eliwoods Geschichte", 0x0C, 0x28], ["Hectors Geschichte", 0x29, 0x45]]
+
+func _open_chapters() -> void:
+	if chapter_panel == null:
+		_build_chapters()
+	menu_root.visible = true
+	menu_box.get_parent().get_parent().visible = false
+	chapter_start.set_item_disabled(0, not (menu_built_mask & 2))
+	if not (menu_built_mask & 2) and menu_built_mask >= 0:
+		chapter_start.select(1)
+	chapter_panel.visible = true
+	var k := minf(1.0, minf(get_viewport().get_visible_rect().size.x * 0.96 / chapter_panel.size.x,
+		get_viewport().get_visible_rect().size.y * 0.96 / chapter_panel.size.y))
+	chapter_panel.pivot_offset = chapter_panel.size * 0.5
+	chapter_panel.scale = Vector2(k, k)
+	chapter_start.call_deferred("grab_focus")
+
+func _close_chapters() -> void:
+	chapter_panel.visible = false
+	if mode == Mode.MENU:
+		menu_box.get_parent().get_parent().visible = true
+		_rebuild_menu_items(menu_built_mask)
+
+func _build_chapters() -> void:
+	chapter_panel = PanelContainer.new()
+	chapter_panel.add_theme_stylebox_override("panel", _panel_style(0.95))
+	chapter_panel.set_anchors_preset(Control.PRESET_CENTER)
+	chapter_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	chapter_panel.grow_vertical = Control.GROW_DIRECTION_BOTH
+	chapter_panel.visible = false
+	ui_layer.add_child(chapter_panel)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 10)
+	chapter_panel.add_child(v)
+	var t := Label.new()
+	_tt(t, "Kapitel wählen")
+	t.add_theme_font_override("font", font_title)
+	t.add_theme_font_size_override("font_size", 40)
+	t.add_theme_color_override("font_color", Color(0.98, 0.9, 0.62))
+	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(t)
+	chapter_start = _opt_row(v, "Start mit", ["Einheiten aus einem Spielstand", "Neues Spiel (nur Einheiten des Kapitels)"], 0, func(_i): pass)
+	chapter_start.custom_minimum_size.x = 560
+	_tr_opts.append([chapter_start, ["Einheiten aus einem Spielstand", "Neues Spiel (nur Einheiten des Kapitels)"]])
+	var note := Label.new()
+	_tt(note, "Der Spielstand wird zu Kapitelbeginn überschrieben. Der Story-Modus (Lyn/Eliwood/Hector) bleibt der des Spielstands.")
+	note.add_theme_font_size_override("font_size", 20)
+	note.add_theme_color_override("font_color", Color(0.8, 0.85, 1, 0.8))
+	v.add_child(note)
+	var sc := ScrollContainer.new()
+	sc.custom_minimum_size = Vector2(1400, 560)
+	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	v.add_child(sc)
+	var list := VBoxContainer.new()
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list.add_theme_constant_override("separation", 8)
+	sc.add_child(list)
+	for grp in CHAPTER_GROUPS:
+		var h := Label.new()
+		_tt(h, grp[0])
+		h.add_theme_font_override("font", font_title)
+		h.add_theme_font_size_override("font_size", 30)
+		h.add_theme_color_override("font_color", Color(0.98, 0.9, 0.62))
+		list.add_child(h)
+		var grid := GridContainer.new()
+		grid.columns = 3
+		grid.add_theme_constant_override("h_separation", 8)
+		grid.add_theme_constant_override("v_separation", 6)
+		list.add_child(grid)
+		var seen := {}
+		for id in range(grp[1], grp[2] + 1):
+			var name: String = core.chapter_title(id)
+			seen[name] = int(seen.get(name, 0)) + 1
+			if seen[name] > 1:
+				name += "  (%d)" % seen[name]   # route variants share a title
+			var b := _button(name, _pick_chapter.bind(id))
+			b.custom_minimum_size = Vector2(450, 46)
+			b.add_theme_font_size_override("font_size", 20)
+			b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+			b.clip_text = true
+			b.tooltip_text = "0x%02X" % id
+			grid.add_child(b)
+	var back := _button(T("Zurück"), func(): _close_chapters())
+	_tr_nodes.append([back, "Zurück"])
+	back.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	v.add_child(back)
+
+func _pick_chapter(id: int) -> void:
+	chapter_panel.visible = false
+	core.debug_chapter(id)
+	var bit := 1 if chapter_start.selected == 0 and (menu_built_mask & 2) else 4
+	_open_slots(bit)
+	_toast("Debug: " + core.chapter_title(id))
+
+## Test: loads every chapter from first to last (debug chapter + restart from slot 1),
+## skips its scenes and saves an overview of the 3D map per chapter, then quits.
+var touring := false
+
+func _chapter_tour(first: int, last: int) -> void:
+	touring = true
+	settings.dof = false
+	_apply_all()
+	DirAccess.make_dir_recursive_absolute(shot_dir())
+	for id in range(first, last + 1):
+		core.reset_to_menu()
+		for k in 400:
+			if not core.busy() and core.menu_mask() != 0:
+				break
+			core.run(20, 0)
+		core.debug_chapter(id)
+		core.choose(1)
+		for k in 400:
+			if core.in_slot_select():
+				break
+			core.run(5, 0)
+		core.slot_pick(0)
+		var f := 0
+		while f < 6000:
+			var keys := 0
+			var ph := f % 48
+			if ph < 4:
+				keys = 8      # START: skip scenes
+			elif ph >= 24 and ph < 28:
+				keys = 2      # B: close what START opened
+			core.run(1, keys)
+			f += 1
+			if f > 1500 and core.is_map() and core.chapter() == id and core.debug_chapter_pending() < 0 and f % 480 == 0:
+				break
+		for k in 120:
+			core.run(1, 2 if k % 20 < 3 else 0)
+		mode = Mode.GAME
+		menu_root.visible = false
+		screen_rect.visible = true
+		for n in find_children("*", "CanvasLayer", true, false):
+			(n as CanvasLayer).visible = false
+		world.cam_ready = false
+		for k in 4:
+			core.run(1, 0)
+			_present(1.0 / 60.0)
+			await get_tree().process_frame
+		var ms: Vector2i = core.map_size()
+		var vv: Vector2i = core.view()
+		world.yaw = 0.0
+		world.pitch_deg = 52.0
+		world.zoom = maxf(ms.x, ms.y * 1.6) / 11.0
+		world.pan = Vector3(ms.x * 0.5 - (vv.x + 120) / 16.0, 0, ms.y * 0.5 - (vv.y + 80) / 16.0)
+		var tc := OS.get_environment("FE7HD_TOUR_CAM").split(",")
+		if tc.size() == 5:
+			world.yaw = float(tc[0])
+			world.pitch_deg = float(tc[1])
+			world.zoom = float(tc[2])
+			world.pan = Vector3(float(tc[3]) + 0.5 - (vv.x + 120) / 16.0, 0, float(tc[4]) + 0.5 - (vv.y + 80) / 16.0)
+		world._yaw_s = world.yaw
+		world._pitch_s = world.pitch_deg
+		world._zoom_s = world.zoom
+		world.cam_ready = false
+		for k in 6:
+			_present(1.0 / 60.0)
+			world._update_camera(1.0)
+			await get_tree().process_frame
+		if not OS.get_environment("FE7HD_TOUR_TYPES").is_empty():
+			await _tour_types(id, ms, vv)
+		else:
+			get_viewport().get_texture().get_image().save_png(shot_dir() + "/tour_%02x.png" % id)
+		printerr("TOUR %02x ch%d map %s %s" % [id, core.chapter(), str(ms), core.chapter_title(id)])
+	get_tree().quit()
+
+var tour_seen := {}
+const TOUR_SKIP := [0x00, 0x01, 0x02, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x15, 0x16, 0x17, 0x18]
+
+## Test: close-up of the first two cells of every terrain type met on the tour.
+func _tour_types(id: int, ms: Vector2i, vv: Vector2i) -> void:
+	var terr: PackedByteArray = core.terrain(0)
+	var hist := {}
+	for v in terr:
+		hist[v & 0x7F] = int(hist.get(v & 0x7F, 0)) + 1
+	printerr("HIST %02x %s" % [id, str(hist)])
+	for i in terr.size():
+		var t: int = terr[i] & 0x7F
+		if t in TOUR_SKIP or int(tour_seen.get(t, 0)) >= 2:
+			continue
+		if tour_seen.has(t) and tour_seen.get("last%d" % t, -1) == id:
+			continue
+		tour_seen[t] = int(tour_seen.get(t, 0)) + 1
+		tour_seen["last%d" % t] = id
+		var cx := i % ms.x
+		var cy := i / ms.x
+		world.yaw = 20.0
+		world.pitch_deg = 38.0
+		world.zoom = 0.42
+		world.pan = Vector3(cx + 0.5 - (vv.x + 120) / 16.0, 0, cy + 0.5 - (vv.y + 80) / 16.0)
+		world._yaw_s = world.yaw
+		world._pitch_s = world.pitch_deg
+		world._zoom_s = world.zoom
+		world.cam_ready = false
+		for k in 4:
+			world._update_camera(1.0)
+			await get_tree().process_frame
+		get_viewport().get_texture().get_image().save_png(shot_dir() + "/type_%02x_%d_ch%02x_%d_%d.png" % [t, tour_seen[t], id, cx, cy])
 
 func _toast(de: String) -> void:
 	toast.text = T(de)
@@ -1714,6 +1930,8 @@ func _close_settings() -> void:
 func _set_paused(p: bool) -> void:
 	paused = p
 	pause_panel.visible = p
+	if debug_pause_btn:
+		debug_pause_btn.visible = settings.debug
 	settings_panel.visible = false
 	if p:
 		(pause_panel.get_child(0).get_child(1) as Control).call_deferred("grab_focus")
@@ -1739,6 +1957,10 @@ func _input(ev: InputEvent) -> void:
 				key_queue.append([GBA_B, 4])
 				get_viewport().set_input_as_handled()
 				return
+		if ev.keycode == KEY_ESCAPE and chapter_panel and chapter_panel.visible:
+			_close_chapters()
+			get_viewport().set_input_as_handled()
+			return
 		if ev.keycode == KEY_F5 and not paused:
 			_quick_save()
 			get_viewport().set_input_as_handled()
@@ -2033,6 +2255,46 @@ func _run_tests() -> void:
 				print("MSIZE %s %d %d" % [str(c[2]), mz.x, mz.y])
 			"zoominfo":
 				print("ZOOM ", world.zoom, " max ", world.max_zoom())
+			"debugch":
+				core.debug_chapter(int(c[2]))
+				print("CH ", core.chapter(), " pending ", core.debug_chapter_pending())
+			"chapters":
+				_open_chapters()
+			"pickch":
+				_pick_chapter(int(c[2]))
+			"sprinfo":
+				var sd: PackedInt32Array = core.sprites()
+				for k in sd.size() / 7:
+					printerr("SP %d %d %d %d f%d" % [sd[k*7], sd[k*7+1], sd[k*7+2], sd[k*7+3], sd[k*7+6]])
+				printerr("FRONT ", world.bld_front.size())
+			"terrnames":
+				for i in 0x42:
+					printerr("TN %02x %s" % [i, core.text(0x58C + 0x55 + i)])
+			"scanterr":
+				for fn in DirAccess.get_files_at(c[2]):
+					if not fn.ends_with(".st"):
+						continue
+					core.load_state(c[2] + "/" + fn)
+					core.run(2, 0)
+					var tr: PackedByteArray = core.terrain(0)
+					var cnt := {}
+					for v in tr:
+						if v in [0x0B, 0x24, 0x30, 0x38]:
+							cnt[v] = int(cnt.get(v, 0)) + 1
+					if not cnt.is_empty():
+						var ms: Vector2i = core.map_size()
+						var gi := tr.find(0x0B)
+						printerr("ST %s %s ch%d gate %d,%d view %s" % [fn, str(cnt), core.chapter(), gi % maxi(ms.x, 1), gi / maxi(ms.x, 1), str(core.view())])
+			"noui":
+				for n in find_children("*", "CanvasLayer", true, false):
+					(n as CanvasLayer).visible = false
+			"chtour":
+				_chapter_tour(int(c[2]), int(c[3]))
+			"chlist":
+				for i in 0x60:
+					printerr("T %02x %s" % [i, core.chapter_title(i)])
+			"chinfo":
+				print("CH ", core.chapter(), " pending ", core.debug_chapter_pending(), " ", core.chapter_title(core.chapter()))
 			"quit":
 				get_tree().quit()
 	if test_frame >= test_keys_until:
@@ -2044,6 +2306,8 @@ func _process(delta: float) -> void:
 	if toast and toast_t > 0.0:
 		toast_t -= delta
 		toast.modulate.a = clampf(toast_t * 2.0, 0.0, 1.0)
+	if touring:
+		return
 	if mode == Mode.LAUNCH and (test_cmds.size() > 0 or test_frame > 0):
 		_run_tests()
 		return
