@@ -39,6 +39,6 @@ Aufbau
 engine/godot         Godot 4.5.1 (Linux x86-64)
 spiel/               Godot-Projekt (Skripte, Shader, Schriften)
 spiel/bin/libfe7hd.so  Spielkern (Interpreter, enthält keinen Spielcode)
-Quelltext:           https://github.com/<dein-name>/fe7-hd2d
+Quelltext:           https://github.com/Papatin13/FH7-HD2D
 lizenzen/            Lizenzen der Fremdbestandteile
 LICENSE.txt          MIT-Lizenz für den eigenen Code
