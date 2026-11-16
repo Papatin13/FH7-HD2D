@@ -1,0 +1,25 @@
+; FE7-HD2D - inoffizielles HD-2D-Remake (benötigt das eigene ROM)
+config_version=5
+
+[application]
+config/name="FE7-HD2D"
+config/description="Inoffizielles HD-2D-Remake, benötigt das eigene ROM"
+run/main_scene="res://main.tscn"
+config/features=PackedStringArray("4.5", "Forward Plus")
+
+[display]
+window/size/viewport_width=1600
+window/size/viewport_height=900
+window/size/resizable=true
+window/vsync/vsync_mode=1
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+
+[rendering]
+rendering_device/fallback_to_opengl3=true
+anti_aliasing/quality/msaa_3d=1
+textures/canvas_textures/default_texture_filter=0
+
+[gui]
+
+theme/default_font_multichannel_signed_distance_field=true

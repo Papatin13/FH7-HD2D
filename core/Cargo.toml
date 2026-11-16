@@ -1,0 +1,13 @@
+[workspace]
+resolver = "2"
+members = ["crates/gba", "crates/recomp", "crates/fe7", "crates/fe7gen", "crates/fe7hd"]
+
+[profile.release]
+opt-level = 3
+debug = false
+codegen-units = 16
+incremental = false
+
+[profile.release.package.fe7gen]
+opt-level = 2
+codegen-units = 16

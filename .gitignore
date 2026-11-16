@@ -1,0 +1,25 @@
+# --- Nintendo data: never commit ---
+*.gba
+*.GBA
+*.sav
+*.ss[0-9]
+# code recompiled from your own ROM (tools/build.sh <rom>)
+/core/generated/
+
+# --- build output ---
+/core/target/
+/godot/bin/*
+!/godot/bin/.gitkeep
+/dist/
+
+# --- Godot ---
+/godot/.godot/*
+!/godot/.godot/extension_list.cfg
+*.import
+/godot/export_presets.cfg
+
+# --- misc ---
+*.png
+!/docs/*.png
+shots/
+.DS_Store

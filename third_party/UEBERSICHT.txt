@@ -1,0 +1,18 @@
+Lizenzen der mitgelieferten Fremdbestandteile
+=============================================
+
+engine/godot          Godot Engine 4.5.1 – MIT-Lizenz (godot-LICENSE.txt),
+                      Bestandteile Dritter: godot-COPYRIGHT.txt
+spiel/bin/libfe7hd.so enthält:
+  godot-rust (gdext) 0.5.5  – Mozilla Public License 2.0 (godot-rust-MPL-2.0.txt),
+                              unveränderter Quelltext: https://github.com/godot-rust/gdext
+  glam 0.32               – MIT oder Apache-2.0 (glam-LICENSE-MIT.txt)
+  libc 0.2                – MIT oder Apache-2.0 (libc-LICENSE-MIT.txt)
+Schriften (spiel/fonts):
+  IM FELL English Roman   – SIL Open Font License 1.1 (OFL-imfell.txt)
+  Uncial Antiqua          – SIL Open Font License 1.1 (OFL-uncial.txt)
+  PT Sans Narrow Bold     – SIL Open Font License 1.1 (OFL-ptsans.txt)
+
+Nicht enthalten: Spieldaten von Nintendo / Intelligent Systems. Grafiken,
+Schrift, Texte, Musik und Spiellogik werden zur Laufzeit aus dem ROM des
+Spielers gelesen. spiel/ui/frames.json enthält nur Adressen im ROM.

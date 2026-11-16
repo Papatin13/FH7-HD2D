@@ -1,0 +1,18 @@
+[package]
+name = "fe7"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+[dependencies]
+gba = { path = "../gba" }
+fe7gen = { path = "../fe7gen" }
+png = "0.17"
+minifb = { version = "0.27", default-features = false, features = ["x11"] }
+cpal = "0.15"
+font8x8 = "0.3"
+winit = "0.30"
+softbuffer = "0.4"
+
+[features]
+# Uses the code recompiled from your own ROM (see tools/build.sh).
+recomp = ["fe7gen/rom"]

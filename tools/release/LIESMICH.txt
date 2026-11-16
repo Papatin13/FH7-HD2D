@@ -1,0 +1,44 @@
+FE7-HD2D – inoffizielles HD-2D-Remake
+=====================================
+
+FE7-HD2D spielt Fire Emblem (GBA) als HD-2D-Remake mit Maus und Tastatur:
+die Karten als 3D-Diorama auf einem Kartentisch, Menüs neu und scharf gezeichnet.
+
+Dieses Paket enthält KEINE Spieldaten. Du brauchst dein eigenes ROM von
+Fire Emblem (Game Boy Advance, US-Version), zum Beispiel eine Sicherungskopie
+deines eigenen Moduls. ROMs aus dem Internet herunterzuladen ist in
+Deutschland nicht erlaubt.
+
+Nicht mit Nintendo oder Intelligent Systems verbunden. "Fire Emblem" ist eine
+Marke von Nintendo.
+
+Starten
+-------
+./start.sh   (oder Doppelklick → "Als Programm ausführen")
+
+Beim ersten Start erscheint der Launcher:
+  * "ROM auswählen …" anklicken oder die .gba-Datei ins Fenster ziehen.
+  * Das ROM wird geprüft (nur das unveränderte US-ROM passt, CRC32 2A524221).
+  * "Spielen" – das ROM wird gemerkt, ab dann startet das Spiel direkt.
+Liegt das ROM im Ordner über diesem, wird es schon vorgeschlagen.
+
+Der Spielstand (.sav) wird neben dem ROM gespeichert.
+Einstellungen: ~/.local/share/godot/app_userdata/FE7-HD2D/
+Um ein anderes ROM zu wählen: dort settings.cfg löschen.
+
+Steuerung (Maus und Tastatur)
+-----------------------------
+Maus: alles anklicken (Karte, Menüs, Listen), Rechtsklick = zurück,
+      Mausrad = blättern / Kamera-Zoom, mittlere Maustaste ziehen = Kamera drehen.
+Tastatur: Pfeile/WASD bewegen, Enter/Leertaste bestätigen, Esc/Rücktaste zurück,
+      Esc auf freier Karte = Pause, Q/Tab nächste Einheit, E/I Einheiteninfo,
+      F5/F8 Schnellspeichern/-laden, F11 Vollbild, Strg halten = Vorspulen.
+
+Aufbau
+------
+engine/godot         Godot 4.5.1 (Linux x86-64)
+spiel/               Godot-Projekt (Skripte, Shader, Schriften)
+spiel/bin/libfe7hd.so  Spielkern (Interpreter, enthält keinen Spielcode)
+Quelltext:           https://github.com/<dein-name>/fe7-hd2d
+lizenzen/            Lizenzen der Fremdbestandteile
+LICENSE.txt          MIT-Lizenz für den eigenen Code

@@ -1,0 +1,11 @@
+[package]
+name = "fe7gen"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+[dependencies]
+gba = { path = "../gba" }
+
+[features]
+# Uses the code recompiled from YOUR OWN ROM in core/generated/ (see tools/build.sh).
+rom = []

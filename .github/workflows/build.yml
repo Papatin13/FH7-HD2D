@@ -1,0 +1,55 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            core/target
+          key: cargo-${{ hashFiles('core/Cargo.lock') }}
+
+      - name: Spielkern bauen (ohne ROM-Code)
+        run: tools/build.sh
+
+      - name: Tests
+        working-directory: core
+        run: cargo test --release -p gba -p fe7hd
+
+      - name: Godot 4.5.1 laden
+        run: |
+          curl -sSL -o godot.zip https://github.com/godotengine/godot/releases/download/4.5.1-stable/Godot_v4.5.1-stable_linux.x86_64.zip
+          unzip -q godot.zip
+
+      - name: Paket bauen
+        run: |
+          VER="${GITHUB_REF_NAME#v}"
+          case "$GITHUB_REF" in refs/tags/*) ;; *) VER="dev-${GITHUB_SHA::7}" ;; esac
+          tools/package.sh ./Godot_v4.5.1-stable_linux.x86_64 "$VER"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FE7-HD2D-linux-x86_64
+          path: dist/*.tar.gz
+
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.tar.gz

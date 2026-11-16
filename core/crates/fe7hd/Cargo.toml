@@ -1,0 +1,18 @@
+[package]
+name = "fe7hd"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+gba = { path = "../gba" }
+fe7gen = { path = "../fe7gen", optional = true }
+godot = { version = "0.5", features = ["api-4-5"] }
+
+[features]
+# Links the code translated from the ROM (only for local builds - never distribute
+# such a build). Without it the game runs on the interpreter alone.
+recomp = ["dep:fe7gen", "fe7gen/rom"]
